@@ -1,0 +1,174 @@
+Documentation for Micro Frontend or Module Federation:
+
+Detail Documentation on Basic Module Federation:
+Check this Link:
+https://medium.com/@surjitsahoo0/how-to-use-module-federation-in-create-react-app-without-ejecting-b63f84a03a3d
+
+Or Read this Document:
+Micro-front-ends are becoming a hot topic nowadays. And webpack’s relatively new feature ModuleFederation allows us to do just that.
+
+What is Module Federation?
+Module Federation is not a library or a framework, It is not a react thing or angular thing, It is not a javascript thing or even a front-end thing.
+
+It is an interface through which one webpack build can interact with another webpack build at runtime.
+
+Why Module Federation?
+The short answer is to share features/components between apps.
+
+But we have been sharing code before module federation as well by creating a reusable node_module package or by using a monorepo. Write the code in one place then import and use it in multiple places. What’s the problem with that?
+
+Well, whenever something changes in our “shared” chunk of code, we have to rebuild and re-deploy all the applications that are using it.
+
+What if we only had to rebuild and re-deploy the part that did change, and all the applications that are using it could get the updates live in runtime!! This is exactly what the Module Federation allows us to do.
+
+Enough chit-chat... Let's build a project now!
+
+Create two applications with create-react-app
+One will be the host and the other will be remote.
+
+npx create-react-app host
+npx create-react-app remote
+Ok Ok… What is the host and what is the remote?? Well, you launch an application, and it starts running, that’s the host. Then this host loads some component/feature from another running application. That another running application is the remote.
+
+Ok, let’s move on…
+
+Now install mf-cra package in both host and remote applications
+cd host
+npm install --save mf-cra
+cd ../remote
+npm install --save mf-cra
+Wait, wait, wait… what is this mf-cra??
+It’s just a small script, that I’ve packed in a node-module for convenience. It applies your module-federation configurations (if the config file exists), then calls the official react-scripts command.
+
+2. Change the start and build commands of both the applications’ package.json files as follows
+
+"scripts": {
+-  "start": "react-scripts start",
++  "start": "mf-cra start",
+-  "build": "react-scripts build",
++  "build": "mf-cra build",
+   "test": "react-scripts test",
+   "eject": "react-scripts eject"
+}
+3. In both the application's root directory create a file called moduleFederation.config.js
+Also create a .env file in remote root directory, we’ll change the default port with it.
+
+remote
+  ├── node_modules
++ ├── moduleFederation.config.js
++ ├── .env
+  └── package.json
+
+host
+  ├── node_modules
++ ├── moduleFederation.config.jsgit commit -m "first commit"
+  └── package.json
+remote/moduleFederation.config.js
+
+const { dependencies } = require('./package.json');
+
+module.exports = {
+  name: 'remote',
+  filename: 'remoteEntry.js',
+  exposes: {
+    './hello': './src/hello.tsx',
+  },
+  remotes: {},
+  shared: {
+    ...dependencies,
+    react: {
+      singleton: true,
+      import: 'react',
+      shareScope: 'default',
+      requiredVersion: dependencies.react,
+    },
+    'react-dom': {
+      singleton: true,
+      requiredVersion: dependencies['react-dom'],
+    },
+    'react-router-dom': {
+      singleton: true,
+      requiredVersion: dependencies['react-router-dom'],
+    },
+  },
+};
+host/moduleFederation.config.js
+
+const { dependencies } = require('./package.json');
+
+module.exports = {
+  name: 'host',
+  filename: 'remoteEntry.js',
+  exposes: {},
+  remotes: {
+    remote: "remote@http://localhost:3001/remoteEntry.js
+  },
+  shared: {
+    ...dependencies,
+    react: {
+      singleton: true,
+      import: 'react',
+      shareScope: 'default',
+      requiredVersion: dependencies.react,
+    },
+    'react-dom': {
+      singleton: true,
+      requiredVersion: dependencies['react-dom'],
+    },
+    'react-router-dom': {
+      singleton: true,
+      requiredVersion: dependencies['react-router-dom'],
+    },
+  },
+};
+remote/.env
+
+PORT=3001
+In summary, both host and remote are opting in for sharing their dependencies. Remote is exposing a component/feature called hello, which we’re yet to create. This exposed feature could be anything, it can be a react component, a react hook or some javascript function. And finally, the host is defining a remote, to which it’ll connect in runtime.
+
+4. Create a file called hello.js in remote/src directory.
+
+remote/src/hello.js
+
+export default function Hello() {
+  return <div>Hello from App 1</div>;
+}
+5. Render the remote component in the host.
+
+host/src/App.js
+
+import Hello from "remote/hello";
+
+export default function App() {
+  return (
+    <div>
+      <div>Host App</div>
+      <Hello />
+    </div>
+  )
+}
+Is that it??…
+
+There’s just one problem, we’re statically importing the remote component as if it were a local file. The host application needs some buffer time to load the remote component before we can use it. To address this issue we need a top-level promise somewhere.
+
+Rename your index.js file in the src directory to bootstrap.js
+Now create a new file called index.js in the src directory
+
+src/index.js
+
+import("./bootstrap");
+
+export const dummy = "This line is only needed if you see, isolatedModules issue"
+This import(“./bootstrap”) is a dynamic import function, it returns a promise. We don’t have to handle the promise or anything. This line is enough. And remember, you have to do this in both projects.
+
+Now boot up both applications and see the magic…
+
+
+Advanced features and further reading:
+Dynamic Module Federation in React.JS (Create-React-App) | by Surjit Kumar Sahoo | Medium
+
+SurjitSahoo/mf-cra: Module Federation in create-react-app without ejecting (github.com)
+
+if Error Found during Rendering or Excution:
+https://github.com/webpack/webpack/issues/13517
+or Search on online platform accroding to errro
